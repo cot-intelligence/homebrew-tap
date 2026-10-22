@@ -1,0 +1,62 @@
+name: Update cot cask
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Stable release version, or leave empty for latest'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-cot-cask
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Test updater integrity checks
+        run: python3 -m unittest discover -s scripts -v
+      - name: Verify release and update cask
+        id: cask
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "${VERSION}" ]; then
+            python3 scripts/update-cask.py --version "${VERSION}"
+          else
+            python3 scripts/update-cask.py
+          fi
+      - name: Publish release update branch
+        env:
+          TAP_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.cask.outputs.version }}
+        run: |
+          if git diff --quiet -- Casks/cot.rb; then
+            echo "Cask already matches the published release."
+            exit 0
+          fi
+          branch="release/cot-v${VERSION}"
+          remote=$(git ls-remote --heads origin "${branch}")
+          if [ -z "${remote}" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git switch -c "${branch}"
+            git add Casks/cot.rb
+            git commit -m "chore(cask): update cot to ${VERSION}"
+            git push origin "${branch}"
+          fi
+          printf '### cot v%s is ready for review\n\nThe DMG matches the published release SHA-256 and size.\n\n[Review and open a PR](https://github.com/%s/compare/main...%s?expand=1). Merge it to publish the Homebrew update.\n' "${VERSION}" "${TAP_REPO}" "${branch}" >> "${GITHUB_STEP_SUMMARY}"
