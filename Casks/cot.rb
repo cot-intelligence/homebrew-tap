@@ -1,6 +1,6 @@
 cask "cot" do
-  version "1.13.3"
-  sha256 "257dd06538181afee31661762f202aa20092d5988ca646fc1722ccfd05f0fa12"
+  version "1.14.0"
+  sha256 "ff9570cab903e8a52cfbc1389c42fb73f090e6e1f259911bf8c28408005e5733"
 
   url "https://github.com/cot-intelligence/cot/releases/download/v#{version}/cot_#{version}_aarch64.dmg"
   name "cot"
